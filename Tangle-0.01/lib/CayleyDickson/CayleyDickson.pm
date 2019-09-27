@@ -1,13 +1,18 @@
-# CayleyDickson.pm - A quantum state machine
+#
+# CayleyDickson.pm - Cayley-Dickson constructions and algebriac manipulations
 #
 #   author: Jeffrey B Anderson - truejeffanderson at gmail.com
 #
 #     reference: https://en.wikipedia.org/wiki/Cayley-Dickson_construction
+#
 
 package CayleyDickson;
+use Data::Dumper;
 use strict;
-use overload qw(- subtract + add * multiply / divide "" as_string eq eq);
 no  warnings;
+use overload qw(- subtract + add * multiply / divide "" as_string eq eq);
+use constant SYMBOLS   => ['', 'i' .. 'z', map('a'.$_,('a' .. 'z')),(map('b'.$_,('a' .. 'z'))) x 100];
+
 
 sub eq { shift->as_string eq shift }
 
@@ -107,7 +112,6 @@ sub new {
    bless [@pair] => $c
 }
 
-use Data::Dumper;
 # object dumping tool ...
 sub d {
    my %a = @_;
@@ -132,8 +136,6 @@ sub tips {
    ref $m->a ? (tips($m->a),tips($m->b)) : (@$m);
 }
 
-
-use constant SYMBOLS   => ['', 'i' .. 'z', map('a'.$_,('a' .. 'z')),(map('b'.$_,('a' .. 'z'))) x 100];
 
 # print the beautiful objects in terse human format ...
 sub as_string {
