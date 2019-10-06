@@ -15,4 +15,4 @@ Revision history for Perl extension Tangle.pm and CayleyDickson.pm
 0.03  TBD
         - added the 8 doubling products available. ref: http://jwbales.us/cdproducts.html
         - compactified the gates for easy diffrentiation by eye.
-
+        - completed CayleyDickson pod documentation.
