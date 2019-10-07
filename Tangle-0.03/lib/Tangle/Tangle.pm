@@ -320,8 +320,9 @@ Tangle - a quantum state machine
 
 =over 3
 
- create Cayley-Dickson constructed numbers and perform math operations on them.
- also creates tensor products.
+ Create quantum probability states in classic memory.
+ Preform quantum gate manipulations and measure the results.
+ Ideal for testing, simulating and understanding quantum programming concepts.
 
 =back
 
