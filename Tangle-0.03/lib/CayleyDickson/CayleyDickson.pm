@@ -14,6 +14,9 @@ use overload qw(- subtract + add * multiply / divide "" as_string eq eq);
 use constant SYMBOLS => ['', 'i' .. 'z', map('a' . $_, ('a' .. 'z')), ( map('b' . $_, ('a' .. 'z')) ) x 100];
 our $VERSION = 0.03;
 
+# logic numbers ...
+use constant YES => 1;
+use constant NO  => 0;
 
 use constant DOUBLING_PRODUCT => 'Pt0';
 #
@@ -32,7 +35,7 @@ use constant DOUBLING_PRODUCT => 'Pt0';
 # ...where lower and upper case are conjugate vectors.
 # ref: http://jwbales.us/cdproducts.html
 
-use constant I_SQUARED => -1;
+use constant I_SQUARED => -YES;
 #
 # I_SQUARED is the square of the first imaginary unit i. Valid options:
 #
@@ -48,9 +51,10 @@ use constant I_SQUARED => -1;
 sub conjugate {
    my $m = shift;
 
-   my $a = ref $m->a ? $m->a->conjugate : $m->a;
-   my $b = - $m->b;
-   (ref $m)->new($a, $b)
+   my $a_conjugate = $m->is_complex ? $m->a : $m->a->conjugate;
+   my $negative_b  = -$m->b;
+
+   (ref $m)->new($a_conjugate, $negative_b)
 }
 
 
@@ -62,8 +66,15 @@ sub inverse {
    my $m  = shift;
 
    my $conjugate = $m->conjugate;
-   my $norm = $m->norm;
+   my $norm      = $m->norm;
    $conjugate / $norm ** 2
+}
+
+
+sub d {
+   my %a = @_;
+   my @k = keys %a;
+   my $d = Data::Dumper->new([@a{@k}],[@k]); $d->Purity(1)->Deepcopy(1); print $d->Dump;
 }
 
 
@@ -74,8 +85,9 @@ sub inverse {
 sub norm {
    my $m = shift;
 
-   my $a = ref $m->a ? $m->a->norm : $m->a;
-   my $b = ref $m->b ? $m->b->norm : $m->b;
+   my $a = $m->is_complex ? $m->a : $m->a->norm;
+   my $b = $m->is_complex ? $m->b : $m->b->norm;
+
    sqrt($a ** 2 + $b ** 2)
 }
 
@@ -91,6 +103,7 @@ sub add {
    my $b = $m->b;
    my $c = $o->a;
    my $d = $o->b;
+
    (ref $m)->new($a + $c, $b + $d)
 }
 
@@ -103,10 +116,12 @@ sub subtract {
    my ( $m, $o, $swap ) = @_;
 
    $o = (ref $m)->new((my $v = $o), 0) unless ref $o;
+
    my $a = $swap ? $o->a : $m->a;
    my $b = $swap ? $o->b : $m->b;
    my $c = $swap ? $m->a : $o->a;
    my $d = $swap ? $m->b : $o->b;
+
    (ref $m)->new($a - $c, $b - $d)
 }
 
@@ -121,6 +136,7 @@ sub divide {
    my ( $a, $b );
    $a = $swap ? $m->inverse : $m;
    $b = $swap ? $o : (ref $o ? $o->inverse : ($o ? 1 / $o : 0));
+
    $a * $b
 }
 
@@ -132,29 +148,50 @@ sub divide {
 sub multiply {
    my ( $m, $o, $swap ) = @_;
 
+   # Ignore $swap since n×c = c×n when n is a number and the reason why swap would be set.
+   
    my ( $ii, $a, $as, $b, $bs, $c, $cs, $d, $ds );
-   return $m * $o if $swap;
+
    $ii = $m->i_squared;
-   $a = $m->a;
-   $b = $m->b;
+   $a  = $m->a;
+   $b  = $m->b;
    if (ref $o) {
       $c  = $o->a;
       $d  = $o->b;
-      $as = ref $a ? $m->a->conjugate : $a;
-      $bs = ref $b ? $m->b->conjugate : $b;
-      $cs = ref $c ? $o->a->conjugate : $c;
-      $ds = ref $d ? $o->b->conjugate : $d;
+      if ($m->is_complex) {
+         $as = $a;
+         $bs = $b;
+      }
+      else {
+         $as = $m->a->conjugate;
+         $bs = $m->b->conjugate;
+      }
+      if ($o->is_complex) {
+         $cs = $c;
+         $ds = $d;
+      }
+      else {
+         $cs = $o->a->conjugate;
+         $ds = $o->b->conjugate;
+      }
    }
    else {
       $c  = $o;
       $d  =  0;
-      $as = ref $a ? $a->conjugate : $a;
-      $bs = ref $b ? $b->conjugate : $b;
+      if ($m->is_complex) {
+         $as = $a;
+         $bs = $b;
+      }
+      else {
+         $as = $a->conjugate;
+         $bs = $b->conjugate;
+      }
       $cs = $o;
       $ds =  0;
    }
 
    # the eight ways to multiply Cayley Dickson number constructions...
+   #
    my $dp = $m->doubling_product;
    if    ($dp eq 'P0' ) { (ref $m)->new($c * $a + $ii * $bs *  $d,  $d * $as +  $b *  $c) }
    elsif ($dp eq 'P1' ) { (ref $m)->new($c * $a + $ii *  $d * $bs, $as *  $d +  $c *  $b) }
@@ -171,15 +208,14 @@ sub multiply {
 # 
 # Tensor: $a->tensor($b) = A⊗ B = (a,b)⊗ (c,d) = (ac,ad,bc,bd)
 #
-# sub tensor { (ref $m)->new( ref $m->a ? ($m->a->tensor($o), $m->b->tensor($o)) : ($m->a * $o, $m->b * $o) ) }
 sub tensor {
    my ( $m, $o ) = @_;
 
-   if (ref $m->a) {
-      (ref $m)->new($m->a->tensor($o), $m->b->tensor($o))
+   if ($m->is_complex) {
+      (ref $m)->new($m->a * $o, $m->b * $o)
    }
    else {
-      (ref $m)->new($m->a * $o, $m->b * $o)
+      (ref $m)->new($m->a->tensor($o), $m->b->tensor($o))
    }
 }
 
@@ -201,8 +237,8 @@ sub new {
 #
 # hold the left number/object in a and the right number/object in b.
 #
-sub a { ${(shift)}[0] }
-sub b { ${(shift)}[1] }
+sub a { ${(shift)}[NO ] }
+sub b { ${(shift)}[YES] }
 
 
 
@@ -211,7 +247,7 @@ sub b { ${(shift)}[1] }
 #
 sub flat {
    my $m = shift;
-   (ref $m->a ? flat($m->a) : $m->a), (ref $m->b ? flat($m->b) : $m->b)
+   $m->is_complex ? ($m->a, $m->b) : ($m->a->flat, $m->b->flat);
 }
 
 
@@ -240,40 +276,40 @@ sub eq { shift->as_string eq shift }
 
 
 # 
-# algebra selection. See I_SQUARED constant above for option choices. Override this method in your subclass if you like.
+# override these methods to test other algebras or the dual and split number systems ...
 #
-sub i_squared { I_SQUARED }
-
-
-
-# 
-# product product. See DOUBLING constant above for option choices. Override this method in your subclass if you like.
+# doubling_product:See DOUBLING constant above for option choices. Override this method in your subclass if you like.
+#
+# i_squared: algebra selection. See I_SQUARED constant above for option choices. Override this method in your subclass if you like.
+#
 #
 sub doubling_product { DOUBLING_PRODUCT }
+sub i_squared        { I_SQUARED        }
 
 
 
 # 
 # additional meta tools ...
 #
-sub is_complex                    { not ( shift )->_child_is('complex'                  ) }
-sub is_quaternion                 {     ( shift )->_child_is('complex'                  ) }
-sub is_octonion                   {     ( shift )->_child_is('quaternion'               ) }
-sub is_sedenion                   {     ( shift )->_child_is('octonion'                 ) }
-sub is_trigintaduonions           {     ( shift )->_child_is('sedenion'                 ) }
-sub is_sexagintaquatronions       {     ( shift )->_child_is('trigintaduonions'         ) }
-sub is_centumduodetrigintanions   {     ( shift )->_child_is('sexagintaquatronions'     ) }
-sub is_ducentiquinquagintasexions {     ( shift )->_child_is('centumduodetrigintanions' ) }
-
+sub is_real                       { NO } # you could not be here if you are real 
+sub is_complex                    { not ref (shift->a) }
+sub is_quaternion                 { shift->_child_is('is_complex'                  ) }
+sub is_octonion                   { shift->_child_is('is_quaternion'               ) }
+sub is_sedenion                   { shift->_child_is('is_octonion'                 ) }
+sub is_trigintaduonions           { shift->_child_is('is_sedenion'                 ) }
+sub is_sexagintaquatronions       { shift->_child_is('is_trigintaduonions'         ) }
+sub is_centumduodetrigintanions   { shift->_child_is('is_sexagintaquatronions'     ) }
+sub is_ducentiquinquagintasexions { shift->_child_is('is_centumduodetrigintanions' ) }
+#sub is_etc ...
 
 
 #
 # determine if the child is of the given type by common cayley dickson name ...
 #
 sub _child_is {
-   my $a = (shift)->a;
-   my $f = 'is_' . (shift);
-   ref $a and $a->can($f) and $a->$f
+   my $m      = shift;
+   my $method = shift;
+   not $m->is_complex and $m->a->can($method) and $m->a->$method;
 }
 
 =encoding utf8
