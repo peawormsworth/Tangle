@@ -18,11 +18,11 @@ our $VERSION = 0.03;
 # CNOT: A⊗ B = (a,b)⊗ (c,d) = (ac,ad,bc,bd)
 #
 sub cnot {
-   my ( $control,$target ) = @_;
+   my ( $control, $target ) = @_;
 
    my $tensor = $control->tensor($target);
 
-   my $q1 = Tangle->new( HR, HR, HR, HR );
+   my $q1 = HR * Tangle->new(1,1,1,1);
    my $cnot = 1 / $q1 * $tensor * $q1;
 
    $target->_extend;
@@ -33,9 +33,6 @@ sub cnot {
    my @ct;
    _extend($control) while (@ct = $control->tips) < @tt;
 
-   #
-   # HELP: this is where I am having trouble. I think...
-   #
    #$control->_gate(Tangle->new(@tt[0,2,3,1]));
    ${$ct[0]} = ${$tt[0]};
    ${$ct[1]} = ${$tt[2]};
@@ -54,8 +51,8 @@ sub swap {
    my $m = shift;
 
    # swap target ends...
-   my $a      = $m->[0];
-   my $b      = $m->[1];
+   my $a   = $m->[0];
+   my $b   = $m->[1];
    $m->[1] = $a;
    $m->[0] = $b;
    $m
@@ -70,8 +67,14 @@ sub swap {
 sub _extend {
    my $m = shift;
 
-   ref $m->a ? _extend($m->a) : ( $${$m->[0]} = \((ref $m)->new((my $u = $m->a), 0)) );
-   ref $m->b ? _extend($m->b) : ( $${$m->[1]} = \((ref $m)->new((my $v = $m->b), 0)) );
+   if ($m->is_qbit) {
+      $${$m->[0]} = \((ref $m)->new((my $u = $m->a), 0));
+      $${$m->[1]} = \((ref $m)->new((my $u = $m->b), 0));
+   }
+   else {
+      _extend($m->a);
+      _extend($m->b);
+   }
    $m
 } 
 
@@ -80,57 +83,56 @@ sub _extend {
 #
 # gate functions ...
 #
-sub x           { my $m = shift; $m->_gate((ref $m)->new(  0,  1 ) / $m) }
-sub y           { my $m = shift; $m->_gate((ref $m)->new(  0, -1 ) / $m) }
-sub z           { my $m = shift; $m->_gate((ref $m)->new( -1,  0 ) / $m) }
-sub i           { my $m = shift; $m->_gate((ref $m)->new(  1,  0 ) / $m) }
-sub h           { my $m = shift; $m->_gate((ref $m)->new( HR, HR ) / $m) }
-sub xx          { die 'incomplete function placeholder' }
-sub yy          { die 'incomplete function placeholder' }
-sub zz          { die 'incomplete function placeholder' }
-sub u           { die 'incomplete function placeholder' }
-sub d           { die 'incomplete function placeholder' }
-sub cx          { die 'incomplete function placeholder' }
-sub cy          { die 'incomplete function placeholder' }
-sub cz          { die 'incomplete function placeholder' }
-sub cs          { die 'incomplete function placeholder' }
-sub not         { die 'incomplete function placeholder' }
-sub rswap       { die 'incomplete function placeholder' }
-sub rnot        { die 'incomplete function placeholder' }
-sub ccnot       { die 'incomplete function placeholder' }
+sub x     { my $m = shift; $m->_gate(     (ref $m)->new(  0,  1 ) / $m) }
+sub y     { my $m = shift; $m->_gate(     (ref $m)->new(  0, -1 ) / $m) }
+sub z     { my $m = shift; $m->_gate(     (ref $m)->new( -1,  0 ) / $m) }
+sub i     { my $m = shift; $m->_gate(     (ref $m)->new(  1,  0 ) / $m) }
+sub h     { my $m = shift; $m->_gate(HR * (ref $m)->new(  1,  1 ) / $m) }
+sub xx    { die 'incomplete function placeholder' }
+sub yy    { die 'incomplete function placeholder' }
+sub zz    { die 'incomplete function placeholder' }
+sub u     { die 'incomplete function placeholder' }
+sub d     { die 'incomplete function placeholder' }
+sub cx    { die 'incomplete function placeholder' }
+sub cy    { die 'incomplete function placeholder' }
+sub cz    { die 'incomplete function placeholder' }
+sub cs    { die 'incomplete function placeholder' }
+sub not   { die 'incomplete function placeholder' }
+sub rswap { die 'incomplete function placeholder' }
+sub rnot  { die 'incomplete function placeholder' }
+sub ccnot { die 'incomplete function placeholder' }
 
-# these function names are reserved by Perl (I think). So another name should be selected ...
-#sub shift      { die 'incomplete function placeholder' }
-#sub swap       { die 'incomplete function placeholder' }
+# DONT USE THE method name "shift" !!!
+#sub shift { die 'incomplete function placeholder' }
 
 
 #
 # optional long form function naming ..,
 #
 sub phase_shift { shift->shift(@_) }
-sub pauli_x     { shift->x(@_)     }
-sub pauli_y     { shift->y(@_)     }
-sub pauli_z     { shift->z(@_)     }
+sub detsch      { shift->d(@_)     }
+sub hadamard    { shift->h(@_)     }
+sub i_gate      { shift->i(@_)     }
 sub pauli_i     { shift->i(@_)     }
 sub identity    { shift->i(@_)     }
-sub toffoli     { shift->ccnot(@_) }
-sub fredkin     { shift->cs(@_)    }
-sub detsch      { shift->d(@_)     }
 sub universal   { shift->u(@_)     }
 sub x_gate      { shift->x(@_)     }
+sub pauli_x     { shift->x(@_)     }
 sub y_gate      { shift->y(@_)     }
+sub pauli_y     { shift->y(@_)     }
 sub z_gate      { shift->z(@_)     }
-sub i_gate      { shift->i(@_)     }
-sub hadamard    { shift->h(@_)     }
-sub root_not    { shift->rnot(@_)  }
-sub root_swap   { shift->rswap(@_) }
+sub pauli_z     { shift->z(@_)     }
+sub cswap       { shift->cs(@_)    }
+sub fredkin     { shift->cs(@_)    }
 sub xnot        { shift->cx(@_)    }
 sub ynot        { shift->cy(@_)    }
 sub znot        { shift->cz(@_)    }
-sub cswap       { shift->cs(@_)    }
 sub ising_xx    { shift->xx(@_)    }
 sub ising_yy    { shift->yy(@_)    }
 sub ising_zz    { shift->zz(@_)    }
+sub root_not    { shift->rnot(@_)  }
+sub root_swap   { shift->rswap(@_) }
+sub toffoli     { shift->ccnot(@_) }
 # end long form function naming
 
 
@@ -139,19 +141,19 @@ sub ising_zz    { shift->zz(@_)    }
 # expects 2 (or 2^n) parameters of numbers of objects
 #
 sub new {
-   my ( $c, $elements ) = ( shift, scalar @_ );
-
-   my @pair;
+   my $c        = shift;
+   my @values   = @_;
+   my $elements = scalar @values;
+   my ($a, $b);
    if ($elements > 2) {
-      @pair = ( \\\($c->new(@_[0 .. $elements/2-1])), \\\($c->new(@_[$elements/2 .. $elements-1])) )
-   }
-   elsif (ref $_[0] and ref $_[0] ne $c) {
-      @pair = @_
+      $a = $c->new(@values[ 0           .. $elements/2 - 1 ]);
+      $b = $c->new(@values[ $elements/2 .. $elements   - 1 ]);
    }
    else {
-      @pair = (\\\$_[0], \\\$_[1])
+      $a = $values[0];
+      $b = $values[1];
    }
-   bless [@pair] => $c
+   bless [ \\\$a, \\\$b ] => $c
 }
 
 
@@ -165,13 +167,20 @@ sub b { $$${ (shift)->[1] } }
 
 
 #
+# is_qbit: a conceptual renaming of the method is_complex()
+#
+sub is_qbit { shift->is_complex }
+
+
+
+#
 # flatten object ends into arrays for easy manipulations ...
 #
 sub flat {
    my $m = shift;
 
-   ref $m->a ? flat($m->a) : $m->a, 
-   ref $m->b ? flat($m->b) : $m->b
+   $m->is_qbit ? $m->a : $m->a->flat, 
+   $m->is_qbit ? $m->b : $m->b->flat 
 }
 
 
@@ -182,7 +191,7 @@ sub flat {
 sub tips {
    my $m = shift;
 
-   ref $m->a ? (tips($m->a),tips($m->b)) : (@$m)
+   $m->is_qbit ? @$m : ( $m->a->tips, $m->b->tips )
 }
 
 
@@ -193,11 +202,11 @@ sub tips {
 sub _gate {
    my ( $m, $o ) = @_;
 
-   my @tm = $m->tips;
-   my @to = $o->tips;
+   my @origin  = $m->tips;
+   my @replace = $o->tips;
 
-   foreach my $i (0 .. $#to) {
-      $${ $tm[$i] } = \($$${ $to[$i] })
+   foreach my $i (0 .. $#replace) {
+      $${ $origin[$i] } = \($$${ $replace[$i] })
    }
    $m
 }
@@ -211,8 +220,8 @@ sub state {
    my $m = shift;
 
    [
-      ( ref $m->a ? @{ $m->a->state } : abs ($m->a) ** 2 ),
-      ( ref $m->b ? @{ $m->b->state } : abs ($m->b) ** 2 )
+      ( $m->is_qbit ? abs $m->a ** 2 : @{ $m->a->state } ),
+      ( $m->is_qbit ? abs $m->b ** 2 : @{ $m->b->state } )
    ]
 }
 
@@ -225,8 +234,8 @@ sub raw_state {
    my $m = shift;
 
    [
-      ( ref $m->a ? @{ $m->a->raw_state } : $m->a ),
-      ( ref $m->b ? @{ $m->b->raw_state } : $m->b )
+      ( $m->is_qbit ? $m->a : @{ $m->a->raw_state } ),
+      ( $m->is_qbit ? $m->b : @{ $m->b->raw_state } )
    ]
 }
 
@@ -256,7 +265,8 @@ sub measure {
 # returns a hash reference: { measured_value => count_of_runs_matching_this_value, ...}
 #
 sub measures {
-   my ( $my, $count ) = ( shift, shift || 1 );
+   my ( $my, $count ) = @_;
+   $count ||= 1;
 
    my %list;
    foreach (1 .. $count) {
