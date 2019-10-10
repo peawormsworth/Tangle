@@ -1,61 +1,87 @@
 #!/usr/bin/perl -wT
 #
-# 120_unit_icosian.pl - generate the 120 Hamiltonion Quaterions of the 600-cell 
-#  then rotate each of its points by 180 around a couple axis
+# 120_unit_icosian.pl - generate the 120 vertex, 600-cell 
+#  using 120 unique quaternions.
+#  then rotate each of these points about an axis
 #
 # ref: https://en.wikipedia.org/wiki/Icosian
 #
+
+# make Space is a CayleyDickson class ( hypercomplex calculators)
+#
+package Space; use base qw(CayleyDickson); 1; 
+
 use strict;
 use lib qw(.);
 use CayleyDickson;
 use Data::Dumper;
+use utf8;
+use constant DEBUG   => 0;
+use constant VERBOSE => 1;
 
-use constant GOLDEN_RATIO     => (sqrt(5)+1)/2;
-use constant GOLDEN_CONJUGATE => -1/GOLDEN_RATIO;
-use constant GR => GOLDEN_RATIO;
-use constant GC => GOLDEN_CONJUGATE;
 
-my @icosians;
+# golden ratio (φ) and golden conjugate (ϕ)
+# have a negative inverse relation:
+#
+#   φ =  –ϕ ⁻¹  and  ϕ =  –φ ⁻¹
+#
 
-foreach my $digit (0,1,2,3) {
-   foreach my $polarity (+1, -1) {
-      my @digits = ((0) x $digit, 2 * $polarity, (0) x (3 - $digit));
-      #push @icosians, CayleyDickson->new((0) x $digit,	$polarity, (0) x (3 - $digit));
-      push @icosians, CayleyDickson->new(@digits) / 2;
+use constant       POINT => 0;                                # zero dimension
+use constant        LINE => ( POINT  **   POINT );            #    1 dimension
+use constant          UP => +LINE;
+use constant        DOWN => -LINE;
+use constant        SPIN => ( UP      ,   DOWN  );            # polarity (+/-)
+use constant        AREA => ( LINE    +   LINE  );            #    2 dimension
+use constant   SPACETIME => ( AREA   **   AREA  );            #    4 dimension
+use constant IMAGINATION => ( AREA   **  -LINE  );            #  1/2 dimension. The place rotated half way between +1 and -1, a distance 1 from 0.
+use constant           φ => ((SPACETIME + LINE  ) ** IMAGINATION + LINE) * IMAGINATION; # golden ratio
+use constant           ϕ => ( -LINE   /   φ     );            # other side of the golden ratio (conjugate)
+use constant     ELEMENT => ( POINT   ,   LINE  ,  φ , ϕ );   # combination of 4 rotated elements
+use constant    ROTATION => Space->new(   POINT, POINT, SPIN  ) * IMAGINATION;
+use constant  INVOLUTION => 1 / ROTATION;
+
+
+my @ICOSIANS;
+
+foreach my $dimension (LINE .. SPACETIME) {
+   foreach my $polarity (SPIN) {
+      my @dimensions = (POINT) x SPACETIME;
+      $dimensions[$dimension - LINE] = AREA * $polarity;
+      push @ICOSIANS, Space->new(@dimensions) * IMAGINATION;
    }
 }
 
 
-foreach my $p1 (1,-1) {
-   foreach my $p2 (1, -1) {
-      foreach my $p3 (1,-1) {
-         foreach my $p4 (1, -1) {
-            push @icosians, CayleyDickson->new( $p1, $p2, $p3, $p4 ) / 2;
+foreach my $p1 (SPIN) {
+   foreach my $p2 (SPIN) {
+      foreach my $p3 (SPIN) {
+         foreach my $p4 (SPIN) {
+            push @ICOSIANS, Space->new( $p1, $p2, $p3, $p4 ) * IMAGINATION;
          }
       }
    }
 }
 
-foreach my $v1 ( 0, 1, GR, GC ) {
+
+foreach my $v1 (ELEMENT) {
    my %set;
-   foreach my $s1 ( +1, -1 ) {
-      $set{$v1} = $s1;
-      foreach my $v2 ( 0, 1, GR, GC ) {
+   foreach my $p1 (SPIN) {
+      $set{$v1} = $p1;
+      foreach my $v2 (ELEMENT) {
          next if $v2 == $v1;
-         foreach my $s2 ( +1, -1 ) {
-            $set{$v2} = $s2;
-            foreach my $v3 ( 0, 1, GR, GC ) {
+         foreach my $p2 (SPIN) {
+            $set{$v2} = $p2;
+            foreach my $v3 (ELEMENT) {
                next if ($v3 == $v2 or $v3 == $v1);
-               foreach my $s3 ( +1, -1 ) {
-                  $set{$v3} = $s3;
-                  foreach my $v4 ( 0, 1, GR, GC ) {
+               foreach my $p3 (SPIN) {
+                  $set{$v3} = $p3;
+                  foreach my $v4 (ELEMENT) {
                      next if ($v4 == $v3 or $v4 == $v2 or $v4 == $v1);
-                     foreach my $s4 ( +1, -1 ) {
-                        $set{$v4} = $s4;
-                        next if $set{0} == -1;
-                        next if $set{GR()} == $set{GC()};
-                        my $q = CayleyDickson->new( $s1*$v1, $s2*$v2, $s3*$v3, $s4*$v4 ) / 2;
-                        push @icosians, $q;
+                     foreach my $p4 (SPIN) {
+                        $set{$v4} = $p4;
+                        next if $set{+POINT} == -LINE;
+                        next if $set{+φ } == $set{+ϕ};
+                        push @ICOSIANS, Space->new( $p1*$v1, $p2*$v2, $p3*$v3, $p4*$v4 ) * IMAGINATION;
                      }
                   }
                }
@@ -65,32 +91,40 @@ foreach my $v1 ( 0, 1, GR, GC ) {
    }
 }
 
-print "The 120 Hamiltonian Quaterions representing the vertex points of the 600-cell:\n\n";
+#
+# Rotate the object by some amount
 
-my $i = 0;
-foreach my $v (@icosians) {
-   $i++;
-   printf "vertex %d: [%s]\n", $i, join(', ', $v->flat);
-}
-
-print "\nNow we rotate the 600-cell:\n\n";
-
-my $rotation = sqrt(1/4) * CayleyDickson->new(0,0,1,-1);
 my @rotated;
-foreach my $v (@icosians) {
-   push @rotated, $rotation * $v * 1/$rotation;
-}
-
-$i = 0;
-foreach my $v (@rotated) {
-   $i++;
-   printf "vertex %d: [%s]\n", $i, join(', ', $v->flat);
+foreach my $v (@ICOSIANS) {
+   push @rotated, ROTATION * $v * INVOLUTION;
 }
 
 
+#
+# Output results ...
+#
 
-#d(icosians => \@icosians);
-printf "Total elements: %d\n", scalar @icosians;
+print "120 Quaterions representing the vertex points of the 600-cell:\n\n";
+
+if (VERBOSE) {
+   my $i = 1;
+   foreach my $v (@ICOSIANS) {
+      printf "vertex %5d: [%s]\n", $i++, join(', ', map(sprintf('  %s%-s', ($_ < 0 ? '-' : '+' ), sprintf('%0.5f', abs($_))), $v->flat));
+   }
+}
+
+
+print "\nRotated 600-cell by ROTATION:\n\n";
+
+if (VERBOSE) {
+   my $i = 1;
+   foreach my $v (@rotated) {
+      printf "vertex %5d: [%s]\n", $i++, join(', ', map(sprintf('  %s%-s', ($_ < 0 ? '-' : '+' ), sprintf('%0.5f', abs($_))), $v->flat));
+   }
+}
+
+d(icosians => \@ICOSIANS) if DEBUG;
+printf "Total elements: %d\n", scalar @ICOSIANS;
 
 sub d {
    my %a = @_;
@@ -102,4 +136,3 @@ sub d {
 1;
 
 __END__
-
