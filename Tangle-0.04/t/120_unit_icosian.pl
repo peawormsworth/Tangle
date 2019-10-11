@@ -121,20 +121,21 @@ for my $vector (@icosians) {
 
 
 if (VERBOSE) {
+   my $i;
 
    print "\n\nOriginal 120 Quaterions representing the vertex points of the 600-cell:\n\n";
-   my $i = 1;
+   $i = 1;
    for my $vector (@icosians) {
       printf "vertex %5d: [%s]\n", $i++, basis($vector);
    }
 
    printf "\n\n120 Quaterions vertex points rotated by %s\n\n", ROTATION;
-   my $i = 1;
+   $i = 1;
    for my $vector (@rotated) {
       printf "vertex %5d: [%s]\n", $i++, basis($vector);
    }
-
 }
+
 
 #
 #  DEBUG Results ...
