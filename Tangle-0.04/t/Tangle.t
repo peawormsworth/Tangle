@@ -1,5 +1,5 @@
 #!/usr/bin/perl -wT
-use Test::More tests => 65;
+use Test::More tests => 87;
 
 use 5.010;
 use warnings;
@@ -10,11 +10,12 @@ use lib qw(./lib/CayleyDickson ./lib/Tangle);
 use Tangle;
 use Data::Dumper;
 
-use constant DEBUG          => 1;
+use constant DEBUG          => 0;
 use constant VERBOSE        => 1;
 use constant SKIP_CNOT_TEST => 0;
-
-use constant PACKAGE => 'Tangle';
+use constant PRECISION      => 10 ** -9;
+use constant PACKAGE        => 'Tangle';
+use constant METHODS        => qw(new cnot swap x y z i h xx yy zz u d cx cy cz cs not rswap rnot ccnot tips state raw_state measure measures);
 
 sub d {
    my %a = @_;
@@ -22,64 +23,80 @@ sub d {
    my $d = Data::Dumper->new([@a{@k}],[@k]); $d->Purity(1)->Deepcopy(1); print $d->Dump;
 }
 
+my ($a,$b,$c,$d,$e,$f,$h,$i,$j,$k,$l,$m,$n,$o,$p,$q,$r,$s,$t,$measures);
 
-my ($a,$b,$c,$d,$e,$h,$i,$o,$measures,$t);
+diag 'Class method tests ...' if VERBOSE;
+foreach my $method (METHODS) {
+   can_ok(PACKAGE, $method);
+}
 
-print "\n###\n### General class tests ...\n###\n\n" if VERBOSE;
-can_ok(PACKAGE, qw(new));
-
-
+diag 'Instantiate tests ...' if VERBOSE;
 $a = Tangle->new(1,2);
-ok($a eq '+1+2i', "(1,2) = $a");
-$b = Tangle->new(3,4);
-ok($b eq '+3+4i', "(3,4) = $b");
+$e = CayleyDickson->new(1,2);
+ok(($a-$e)->norm < PRECISION, "(1,2) : expect: $e, calc: $a");
 
-print "\n###\n### Tensor tests ...\n###\n\n" if VERBOSE;
+$a = Tangle->new(3,4);
+$e = CayleyDickson->new(3,4);
+ok(($a-$e)->norm < PRECISION, "(3,4) : expect: $e, calc: $a");
+
+diag 'Tensor tests ...' if VERBOSE;
+$a = Tangle->new(1,2);
+$b = Tangle->new(3,4);
 $c = $a->tensor($b);
-ok($c eq '+3+4i+6j+8k', " (1,2)⊗ (3,4)                 = $c");
+$e = CayleyDickson->new(3,4,6,8);
+ok(($c-$e)->norm < PRECISION, " (1,2)⊗ (3,4)                 : expect: $e, calc: $c");
+
 
 $a = Tangle->new(0,1);
 $b = Tangle->new(0,1);
 $c = Tangle->new(1,0);
 $d = $b->tensor($c);
-ok($d eq '+0+1j', " (0,1)⊗ (1,0)         = |10>  = $d");
-$e = $a->tensor($d);
-ok($e eq '+0+1n', " (0,1)⊗ (0,1)⊗ (1,0)  = |110> = $e");
+$e = CayleyDickson->new(0,0,1,0);
+ok(($d-$e)->norm < PRECISION, " (0,1)⊗ (1,0)         = |10>  : expect: $e, calc: $d");
+
+$f = $a->tensor($d);
+$e = CayleyDickson->new(0,0,0,0,0,0,1,0,0);
+ok(($f-$e)->norm < PRECISION, " (0,1)⊗ (0,1)⊗ (1,0)  = |110> : expect: $e, calc: $f");
 
 $a = Tangle->new(1,0);
 $b = Tangle->new(1,0);
 $c = $b->tensor($a);
-ok($c eq '+1',    " (1,0)⊗ (1,0)         = |00>  = $c");
+$e = CayleyDickson->new(1,0,0,0);
+ok(($c-$e)->norm < PRECISION, " (0,1)⊗ (1,0)         = |00>  : expect: $e, calc: $c");
 
 $a = Tangle->new(1,0);
 $b = Tangle->new(0,1);
 $c = $a->tensor($b);
-ok($c eq '+0+1i', " (1,0)⊗ (0,1)         = |01>  = $c");
+$e = CayleyDickson->new(0,1,0,0);
+ok(($c-$e)->norm < PRECISION, " (1,0)⊗ (1,0)         = |01>  : expect: $e, calc: $c");
 
 $a = Tangle->new(0,1);
 $b = Tangle->new(1,0);
 $c = $a->tensor($b);
-ok($c eq '+0+1j', " (0,1)⊗ (1,0)         = |10>  = $c");
+$e = CayleyDickson->new(0,0,1,0);
+ok(($c-$e)->norm < PRECISION, " (0,1)⊗ (1,0)         = |10>  : expect: $e, calc: $c");
 
 $a = Tangle->new(0,1);
 $b = Tangle->new(0,1);
 $c = $a->tensor($b);
-ok($c eq '+0+1k', "(0,1)⊗ (0,1)         = |11>  = $c");
+$e = CayleyDickson->new(0,0,0,1);
+ok(($c-$e)->norm < PRECISION, " (0,1)⊗ (0,1)         = |11>  : expect: $e, calc: $c");
 
 $a = Tangle->new(0,1);
 $b = Tangle->new(1,0);
 $c = Tangle->new(1,0);
 $d = $a->tensor($b)->tensor($c);
-ok($d eq '+0+1l', "(0,1)⊗ (1,0)⊗ (1,0)  = |100> = $d");
+$e = CayleyDickson->new(0,0,0,0,1,0,0,0,0);
+ok(($d-$e)->norm < PRECISION, " (0,1)⊗ (1,0)⊗ (1,0)  = |100> : expect: $e, calc: $d");
 
-print "\n###\n### gate tests ...\n###\n\n" if VERBOSE;
+diag 'Gate tests ...' if VERBOSE;
 
 $a = Tangle->new(1,2,3,4);
 $a->b->swap;
+$e = CayleyDickson->new(1,2,4,3);
 #$a->swap;
-ok($a eq '+1+2i+4j+3k', "SWAP-B(1,2,3,4)  = (1,2,4,3) - calc: $a");
+ok(($a-$e)->norm < PRECISION, "SWAP-B(1,2,3,4)  = (1,2,4,3) : expect: $e, calc: $a");
 
-#die;
 foreach my $set (
    #['SWAP [1,2,3,4]   = [1,2,4,3]' => [0,1], [0,1],[0,0,1,0],'+1+2i+4j+3k'],
    ['cnot |00> = |00> = [1,0,0,0]' => [1,0], [1,0],[1,0,0,0],'+1'         ],
@@ -90,248 +107,272 @@ foreach my $set (
    my $label = @$set[0];
    my $c = Tangle->new(@{$set->[1]});
    my $t = Tangle->new(@{$set->[2]});
-   my $r = Tangle->new(@{$set->[3]});
+   my $e = CayleyDickson->new(@{$set->[3]});
    d(c => $c) if DEBUG;
    d(t => $t) if DEBUG;
    $c->cnot($t);
    d(c => $c) if DEBUG;
    d(t => $t) if DEBUG;
-   #d(expect => $r);
-   ok($t eq $r, "$label - calc: $c");
+   ok(($t-$e)->norm < PRECISION, "$label : expect: $e, calc: $t");
 }
 
-print "\n###\n### superpositions ...\n###\n\n" if VERBOSE;
+diag 'Superpositions states...' if VERBOSE;
 $a = Tangle->new(1/sqrt(2),1/sqrt(2));
 $b = Tangle->new(1/2,sqrt(3)/2);
 $d = Tangle->new(1/sqrt(2),-1/sqrt(2));
-ok($a->a ==   $a->b, "(√½,√½)  = $a");
-ok($d->a == - $d->b, "(√½,-√½) = $d");
+ok($a->a - $a->b < PRECISION, "(√½,√½)  = $a");
+ok($d->a + $d->b < PRECISION, "(√½,-√½) = $d");
 
-print "\n###\n### x-gate ...\n###\n\n" if VERBOSE;
+diag 'X-gate ...' if VERBOSE;
 $c = Tangle->new(0,1);
 $c->y_gate;
-ok($c eq '-1', "(-1,0) = $c");
+$e = CayleyDickson->new(-1,0);
+ok(($e-$c)->norm < PRECISION, "(-1,0) : expect: $e, clac: $c");
 
-print "\n###\n### measurements ...\n###\n\n" if VERBOSE;
+use constant MEASURES => 10000;
+use constant MEASURE_PRECISION => 10 ** -1;
+
+###################################################
+diag 'Measurements ...' if VERBOSE;
 $a = Tangle->new(1/sqrt(2),1/sqrt(2));
+$measures = $a->measures(MEASURES);
+ok( 
+   ( abs($measures->{0}-.5) < MEASURE_PRECISION and abs($measures->{1}-.5) < MEASURE_PRECISION ),
+   sprintf('50%%/50%% measure 0/1 on %s runs of (√½,√½) within %s%%', MEASURES, 100 * MEASURE_PRECISION)
+);
+
+$a = Tangle->new(1,0);
+$measures = $a->measures(MEASURES);
+ok( 
+   $measures->{0} == 1,
+   sprintf('   100%% measure   0 on %s runs of ( 1, 0) within %s%%', MEASURES, 100 * MEASURE_PRECISION)
+);
+
+$a = Tangle->new(0,1);
 $measures = $a->measures(10000);
-ok((abs($measures->{0}-.5)<.1 and abs($measures->{1}-.5) < .1), "50%/50% measure 0/1 on 10,000 runs of (√½,√½)");
-
-$b = Tangle->new(1,0);
-$measures = $b->measures(10000);
-ok($measures->{0} eq 1, "100% measure 0 on 10,000 runs of (1,0)");
-
-$c = Tangle->new(0,1);
-$measures = $c->measures(10000);
-ok($measures->{1} eq 1, "100% measure 1 on 10,000 runs of (0,1)");
+ok($measures->{1} == 1, sprintf('   100%% measure   1 on %s runs of ( 0, 1) within %s%%', MEASURES, 100 * MEASURE_PRECISION));
 
 # 50/50 x 50/50 is 1/4,1/4,1/4,1/4
 $a = Tangle->new(1/sqrt(2),1/sqrt(2));
 $b = Tangle->new(1/sqrt(2),1/sqrt(2));
 $h = $a->tensor($b);
 $measures = $h->measures(10000);
-ok((abs($measures->{0}-.25)<.1 and abs($measures->{1}-.25) < .1 and abs($measures->{2}-.25)<.1 and abs($measures->{3}-.25)), "(1/2,1/2,1/2,1/2) has equal 25% probabilities");
+ok(
+   (abs($measures->{0}-.25) < MEASURE_PRECISION and abs($measures->{1}-.25) < MEASURE_PRECISION and abs($measures->{2}-.25) < MEASURE_PRECISION and abs($measures->{3}-.25) < MEASURE_PRECISION), 
+   sprintf('  %s measures of (1/2,1/2,1/2,1/2) has equal 25%% probabilities within %s%%', MEASURES, 100 * MEASURE_PRECISION)
+);
 
-print "\n###\n### Hadamard and Y-gate tests ...\n###\n\n" if VERBOSE;
+###################################################
+diag 'Hadamard and Y-gate tests ...' if VERBOSE;
 
 $a = Tangle->new(1/sqrt(2),sqrt(3)/2);
 $b = Tangle->new(sqrt(3)/2,1/sqrt(2));
 $a->swap;
-#d(aa => $a->a);
-#d(ba => $b->a);
-#d(ab => $a->b);
-#d(bb => $b->b);
-ok(($a->a eq $b->a and $a->b eq $b->b), 'SWAP(√½,√3/2)            = (√3/2,√½)');
+ok(($a->a - $b->a < PRECISION and $a->b - $b->b < PRECISION), 'SWAP(√½,√3/2)            = (√3/2,√½)');
+ok(($a->a - $b->a < PRECISION and $a->b - $b->b < PRECISION), 'SWAP(√½,√3/2)            = (√3/2,√½)');
 
 #$a = Tangle->new(1,0);
 $a = Tangle->new(1,0);
 $a->hadamard;
-ok(abs($a->a-1/sqrt(2) < 0.0000001 and abs($a->b-1/sqrt(2)< 0.0000001)),'Hadamard(|0>)            = |+>');
+$e = CayleyDickson->new(sqrt(1/2),sqrt(1/2));
+ok(($a - $e)->norm < PRECISION, "Hadamard(|0>)            = |+>  : expect: $e, calc: $a");
 
 $a = Tangle->new(0,1);
 $a->hadamard;
-ok(abs($a->a-1/sqrt(2) < 0.0000001 and abs($a->b+1/sqrt(2)< 0.0000001)),'Hadamard(|1>)            = |->');
+$e = CayleyDickson->new(sqrt(1/2),-sqrt(1/2));
+ok(($a - $e)->norm < PRECISION, "Hadamard(|1>)            = |->  : expect: $e, calc: $a");
 
 $a = Tangle->new(1,0);
 $a->hadamard;
 $a->hadamard;
-ok((int $a->a == 1 and int $a->b == 0), "Hadamard(Hadamard(1,0))  = (1,0)");
+$e = CayleyDickson->new(1,0);
+ok(($a - $e)->norm < PRECISION, "Hadamard(Hadamard(|0>))  = |0>  : expect: $e, calc: $a");
 
 $a = Tangle->new(0,1);
 $a->hadamard;
 $a->hadamard;
-ok((int $a->a == 0 and int $a->b == 1), "Hadamard(Hadamard(0,1))  = (0,1)");
+$e = CayleyDickson->new(0,1);
+ok(($a - $e)->norm < PRECISION, "Hadamard(Hadamard(|1>))  = |1>  : expect: $e, calc: $a");
 
 ###################################################
-print "\n###\n### Hadamard and X-gate tests ...\n###\n\n" if VERBOSE;
+diag 'Hadamard and X-gate tests ...' if VERBOSE;
+
 $a = Tangle->new(1,0);
 $a->x_gate;
 $a->hadamard;
-ok(abs(int $a->a-1/sqrt(2) < 0.0000001 and abs(int $a->b+1/sqrt(2)< 0.0000001)),'Hadamard(XGate(1,0)      = (√½,√½)');
+$e = CayleyDickson->new(sqrt(1/2),-sqrt(1/2));
+ok(($a - $e)->norm < PRECISION, "Hadamard(XGate(|0>))     = ( √½,-√½) =  |-> : expect: $e, calc: $a");
 
 $a = Tangle->new(0,1);
 $a->x_gate;
 $a->hadamard;
-ok(abs(int $a->a-1/sqrt(2) < 0.0000001 and abs(int $a->b-1/sqrt(2)< 0.0000001)),'Hadamard(XGate(0,1)      = (√½,-√½)');
+$e = CayleyDickson->new(sqrt(1/2),sqrt(1/2));
+ok(($a - $e)->norm < PRECISION, "Hadamard(XGate(|1>))     = ( √½, √½) =  |+> : expect: $e, calc: $a");
 
 $a = Tangle->new(1/sqrt(2),1/sqrt(2));
 $a->x_gate;
 $a->hadamard;
-ok($a eq '+1', 'Hadamard(XGate(√½,√½))   = (1,0)');
+$e = CayleyDickson->new(1,0);
+ok(($a - $e)->norm < PRECISION, "H(X(√½,√½)) = H(X(|+>))  = ( √½, √½) =  |+> : expect: $e, calc: $a");
 
 $a = Tangle->new(-1/sqrt(2),1/sqrt(2));
 $a->x_gate;
 $a->hadamard;
-ok($a eq '+0+1i', 'Hadamard(XGate(-√½,√½))  = (1,0)');
+$e = CayleyDickson->new(0,1);
+ok(($a - $e)->norm < PRECISION, "H(X(-√½,√½))= H(X(-|+>)) = (  0, 1 ) =  |1> : expect: $e, calc: $a");
 
 $a = Tangle->new(1/sqrt(2),-1/sqrt(2));
 $a->x_gate;
 $a->hadamard;
-ok($a eq '+0-1i','Hadamard(XGate(√½,-√½))  = |+>');
+$e = CayleyDickson->new(0,-1);
+ok(($a - $e)->norm < PRECISION, "H(X(√½,-√½))= H(X(|->))  = (  0,-1 ) = -|0> : expect: $e, calc: $a");
 
 $a = Tangle->new(0,-1);
 $a->x_gate;
 $a->hadamard;
-ok(abs(int $a->a+1/sqrt(2) < 0.0000001 and abs(int $a->b+1/sqrt(2)< 0.0000001)),'Hadamard(XGate(0,1)      = (-√½,-√½)');
+$e = CayleyDickson->new(-sqrt(1/2),-sqrt(1/2));
+ok(($a - $e)->norm < PRECISION, "H(X(0,-1))= H(X(-|1>))   = (-√½,-√½) = -|+> : expect: $e, calc: $a");
 
 $a = Tangle->new(-1,0);
 $a->x_gate;
 $a->hadamard;
-ok(abs(int $a->a+1/sqrt(2) < 0.0000001 and abs(int $a->b-1/sqrt(2)< 0.0000001)),'Hadamard(XGate(-1,0))    = (-√½,√½)');
+$e = CayleyDickson->new(-sqrt(1/2),sqrt(1/2));
+ok(($a - $e)->norm < PRECISION, "H(X(-1,0))= H(X(-|0>))   = (-√½, √½) = -|-> : expect: $e, calc: $a");
 
 $a = Tangle->new(-1/sqrt(2),-1/sqrt(2));
 $a->x_gate;
 $a->hadamard;
-ok($a eq '-1','Hadamard(XGate(-√½,-√½)) = (0,-1)');
+$e = CayleyDickson->new(-1,0);
+ok(($a - $e)->norm < PRECISION, "H(X(-√½,-√½))= H(X(-|+>))= ( -1, 0 ) = -|0> : expect: $e, calc: $a");
+
+###################################################
+diag '16 step walk about the complex unit circle: X(H(X(H(X(H(X(H(X(H(X(H(X(H(X(H(|0>)))))))) = |0>' if VERBOSE;
 
 $a = Tangle->new(1,0);
-print "\n###\n### 16 step walk about the complex unit circle ...\n### X(H(X(H(X(H(...))))) = (...)\n###\n\n" if VERBOSE;
-ok($a eq '+1'                                                     , "Step 0: Starting value (1,0)     = $a");
-$a->x_gate;
-ok($a eq '+0+1i'                                                  , "Step 1: (1,0)       = (0,1)      = $a");
-$a->hadamard;
-ok((($a - Tangle->new(+sqrt(1/2),-sqrt(1/2)))->norm < 0.000000001), "Step 2: H(0,1)      = (√½,-√½)   = $a");
-$a->x_gate;
-ok((($a - Tangle->new(-sqrt(1/2),+sqrt(1/2)))->norm < 0.000000001), "Step 3: X(√½,-√½)   = (-√½,√½)   = $a");
-$a->hadamard;
-ok($a eq '+0-1i'                                                  , "Step 4: H(-√½,√½)   = (0,-1)     = $a");
-$a->x_gate;
-ok($a eq '-1'                                                     , "Step 5: X(0,-1)     = (-1,0)     = $a");
-$a->hadamard;
-ok((($a - Tangle->new(-sqrt(1/2),-sqrt(1/2)))->norm < 0.000000001), "Step 6: H(-1,0)     = (-√½,-√½)  = $a");
-$a->x_gate;
-ok((($a - Tangle->new(-sqrt(1/2),-sqrt(1/2)))->norm < 0.000000001), "Step 7: X(-√½,-√½)  = (-√½,-√½)  = $a");
-$a->hadamard;
-ok($a eq '-1'                                                     , "Step 8: H(-√½,-√½)  = (-1,0)     = $a");
-$a->x_gate;
-ok($a eq '+0-1i'                                                  , "Step 9: X(-1,0)     = (0,-1)     = $a");
-$a->hadamard;
-ok((($a - Tangle->new(-sqrt(1/2),+sqrt(1/2)))->norm < 0.000000001), "Step 10: H(0,-1)    = (-√½,√½)   = $a");
-$a->x_gate;
-ok((($a - Tangle->new(+sqrt(1/2),-sqrt(1/2)))->norm < 0.000000001), "Step 11: X(-√½,√½)  = (√½,-√½)   = $a");
-$a->hadamard;
-ok($a eq '+0+1i'                                                  , "Step 12: H(√½,-√½)  = (0,1)      = $a");
-$a->x_gate;
-ok($a eq '+1'                                                     , "Step 13: X(0,1)     = (1,0)      = $a");
-$a->hadamard;
-ok((($a - Tangle->new(+sqrt(1/2),+sqrt(1/2)))->norm < 0.000000001), "Step 14: H(1,0)     = (√½,√½)    = $a");
-$a->x_gate;
-ok((($a - Tangle->new(+sqrt(1/2),+sqrt(1/2)))->norm < 0.000000001), "Step 15: X(-√½,√½)  = (√½,-√½)   = $a");
-$a->hadamard;
-ok($a eq '+1'                                                     , "Step 16: H(√½,√½)   = (1,0)      = $a");
+$e = CayleyDickson->new(1,0);
+ok(($a-$e)->norm < PRECISION                                      , "Step 0: Starting    = (1,0)      : expect: $e, calc: $a");
 
-print "\n###\n### 4 Black box gate actions: constant 1/0, identity and negate ...\n###\n\n" if VERBOSE;
-$i = Tangle->new(1,0);
-$o = Tangle->new(1,0);
-ok(($i eq '+1'    and $o eq '+1'), "Constant-0 |00> = |00>");
+$a->x_gate;
+$e = CayleyDickson->new(+0,1);
+ok(($a-$e)->norm < PRECISION                                      , "Step 1: X(1,0)      = (0,1)      : expect: $e, calc: $a");
 
-$i = Tangle->new(0,1);
-$o = Tangle->new(1,0);
-ok(($i eq '+0+1i' and $o eq '+1'), "Constant-0 |10> = |00>");
+$a->hadamard;
+$e = CayleyDickson->new(+sqrt(1/2),-sqrt(1/2));
+ok(($a-$e)->norm < PRECISION                                      , "Step 2: H(0,1)      = (√½,-√½)   : expect: $e, calc: $a");
 
-$i = Tangle->new(1,0);
-$o = Tangle->new(1,0);
-$o->x_gate;
-ok(($i eq '+1' and $o eq '+0+1i'), "Constant-1 |00> = |01>");
+$a->x_gate;
+$e = CayleyDickson->new(-sqrt(1/2),+sqrt(1/2));
+ok(($a-$e)->norm < PRECISION                                      , "Step 3: X(√½,-√½)   = (-√½,√½)   : expect: $e, calc: $a");
 
-$i = Tangle->new(0,1);
-$o = Tangle->new(1,0);
-ok(($i eq '+0+1i' and $o eq '+1'), "Constant-1 |10> = |11>");
+$a->hadamard;
+$e = CayleyDickson->new(+0,-1);
+ok(($a-$e)->norm < PRECISION                                      , "Step 4: H(-√½,√½)   = (0,-1)     : expect: $e, calc: $a");
+
+$a->x_gate;
+$e = CayleyDickson->new(-1,0);
+ok(($a-$e)->norm < PRECISION                                      , "Step 5: X(0,-1)     = (-1,0)     : expect: $e, calc: $a");
+
+$a->hadamard;
+$e = CayleyDickson->new(-sqrt(1/2),-sqrt(1/2));
+ok(($a-$e)->norm < PRECISION                                      , "Step 6: H(-1,0)     = (-√½,-√½)  : expect: $e, calc: $a");
+
+$a->x_gate;
+$e = CayleyDickson->new(-sqrt(1/2),-sqrt(1/2));
+ok(($a-$e)->norm < PRECISION                                      , "Step 7: X(-√½,-√½)  = (-√½,-√½)  : expect: $e, calc: $a");
+
+$a->hadamard;
+$e = CayleyDickson->new(-1,0);
+ok(($a-$e)->norm < PRECISION                                      , "Step 8: H(-√½,-√½)  = (-1,0)     : expect: $e, calc: $a");
+
+$a->x_gate;
+$e = CayleyDickson->new(0,-1);
+ok(($a-$e)->norm < PRECISION                                      , "Step 9: X(-1,0)     = (0,-1)     : expect: $e, calc: $a");
+
+$a->hadamard;
+$e = CayleyDickson->new(-sqrt(1/2),+sqrt(1/2));
+ok(($a-$e)->norm < PRECISION                                      , "Step 10: H(0,-1)    = (-√½,√½)   : expect: $e, calc: $a");
+
+$a->x_gate;
+$e = CayleyDickson->new(+sqrt(1/2),-sqrt(1/2));
+ok(($a-$e)->norm < PRECISION                                      , "Step 11: X(-√½,√½)  = (√½,-√½)   : expect: $e, calc: $a");
+
+$a->hadamard;
+$e = CayleyDickson->new(0,1);
+ok(($a-$e)->norm < PRECISION                                      , "Step 12: H(√½,-√½)  = (0,1)      : expect: $e, calc: $a");
+
+$a->x_gate;
+$e = CayleyDickson->new(1,0);
+ok(($a-$e)->norm < PRECISION                                      , "Step 13: X(0,1)     = (1,0)      : expect: $e, calc: $a");
+
+$a->hadamard;
+$e = CayleyDickson->new(+sqrt(1/2),+sqrt(1/2));
+ok(($a-$e)->norm < PRECISION                                      , "Step 14: H(1,0)     = (√½,√½)    : expect: $e, calc: $a");
+
+$a->x_gate;
+$e = CayleyDickson->new(+sqrt(1/2),+sqrt(1/2));
+ok(($a-$e)->norm < PRECISION                                      , "Step 15: X(-√½,√½)  = (√½,-√½)   : expect: $e, calc: $a");
+
+$a->hadamard;
+$e = CayleyDickson->new(1,0);
+ok(($a-$e)->norm < PRECISION                                      , "Step 16: H(√½,√½)   = (1,0)      : expect: $e, calc: $a");
+
+
+###################################################
+diag '4 Black box gate actions: constant 1/0, identity and negate ...' if VERBOSE;
 
 $c = Tangle->new(1,0);
 $t = Tangle->new(1,0);
-$c->cnot($t);
-ok(($c eq '+1'                  ), "Identity   |00> = |00>");
+$r = $c->tensor($t);
+$e = CayleyDickson->new(1,0,0,0);
+ok(($r-$e)->norm < PRECISION, "Constant-0 |00> = |00> : expect: $e, calc: $r");
 
 $c = Tangle->new(0,1);
 $t = Tangle->new(1,0);
-$c->cnot($t);
-ok(($c eq '+0+1k'               ), "Identity   |10> = |11>");
-
+$r = $c->tensor($t);
+$e = CayleyDickson->new(0,0,1,0);
+ok(($r-$e)->norm < PRECISION, "Constant-0 |10> = |10> : expect: $e, calc: $r");
 
 $c = Tangle->new(1,0);
 $t = Tangle->new(1,0);
-$c->cnot($t);
 $t->x_gate;
-ok(($c eq '+0+1i'               ), "Negate     |00> = |01>");
+$r = $c->tensor($t);
+$e = CayleyDickson->new(0,1,0,0);
+ok(($r-$e)->norm < PRECISION, "Constant-1 |00> = |01> : expect: $e, calc: $r");
 
 $c = Tangle->new(0,1);
 $t = Tangle->new(1,0);
-$c->cnot($t);
 $t->x_gate;
-SKIP: {
-   skip 'Negate |10> is not fully operational', 1;
-   ok(($c eq '+0+1j'               ), "Negate     |10> = |10>");
-}
+$r = $c->tensor($t);
+$e = CayleyDickson->new(0,0,0,1);
+ok(($r-$e)->norm < PRECISION, "Constant-1 |10> = |11> : expect: $e, calc: $r");
 
-$i = 0;
-foreach my $set (
-   ['Constant 0 - a contant operation' => 0,0,'+0+1k => [ 0, 0, 0, 1]','+0+1k'], # Always returns 0
-   ['Constant 1 - a contant operation' => 1,0,'+0-1k => [ 0, 0, 0,-1]','+0-1k'], # Always returns 1
-   ['Negation  - a variable operation' => 1,1,'+0-1i => [ 0,-1, 0, 0]','+0-1i'], # Returns the negated
-   ['Identity  - a variable operation' => 0,1,'+0+1i => [ 0, 1, 0, 0]','+0+1i'], # Returns the input
-) {
-   $i++;
-   my $label         = $$set[0];
-   my $x_gate        = $$set[1];
-   my $cnot          = $$set[2];
-   my $expect        = $$set[3];
-   my $expect_string = $$set[4];
+$c = Tangle->new(1,0);
+$t = Tangle->new(1,0);
+$r = $c->cnot($t);
+$e = CayleyDickson->new(1,0,0,0);
+ok(($r-$e)->norm < PRECISION, "Identity   |00> = |00> : expect: $e, calc: $r");
 
-   my $c = Tangle->new(1,0);
-   my $t = Tangle->new(1,0);
+$c = Tangle->new(0,1);
+$t = Tangle->new(1,0);
+$r = $c->cnot($t);
+$e = CayleyDickson->new(0,0,0,1);
+ok(($r-$e)->norm < PRECISION, "Identity   |10> = |11> : expect: $e, calc: $r");
 
-   $c->x_gate;
-   $t->x_gate;
+$c = Tangle->new(1,0);
+$t = Tangle->new(1,0);
+$r = $c->cnot($t);
+$t->x_gate;
+$e = CayleyDickson->new(0,0,1,0);
+ok(($r-$e)->norm < PRECISION, "Negate     |00> = |01> : expect: $e, calc: $r");
 
-   $c->hadamard;
-   $t->hadamard;
-
-   #$c->cnot($t) if $cnot;
-   $c->cnot($t) if $cnot;
-   $t->x_gate   if $x_gate;
-
-   $t->hadamard;
-   $c->hadamard;
-
-   d(t => $t) if DEBUG;
-   d(c => $c) if DEBUG;
-
-   # create the tesor to generate the quaterion of the braket values...
-   $t = $c->tensor($t) if $t->is_complex;
-   
-   SKIP: {
-      #last unless $i == 4;
-      #skip "'$label' because CNOT is not fully operational", 1 if SKIP_CNOT_TEST and $i == 4;
-      skip "'$label' because CNOT is not fully operational", 1 if SKIP_CNOT_TEST;
-
-      ok($t->as_string eq $expect_string, "Option $i : $label, expect: $expect_string, found: $t");
-   };
-
-}
+$c = Tangle->new(0,1);
+$t = Tangle->new(1,0);
+$r = $c->cnot($t);
+$t->x_gate;
+$e = CayleyDickson->new(0,-1,0,0);
+ok(($r-$e)->norm < PRECISION, "Negate     |10> = |10> : expect: $e, calc: $r");
 
 
 1;
 
 __END__
-
